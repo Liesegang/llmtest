@@ -50,7 +50,16 @@ def main():
     audio_io = AudioIO(sample_rate=16000)
 
     # 1. TTS初期化
-    tts = KokoroTTS(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH, audio_io)
+    # tts = KokoroTTS(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH, audio_io)
+    
+    # Use MeloTTS -> Replaced with Style-Bert-VITS2 API
+    # from tts_melo import MeloTTS
+    # tts = MeloTTS(audio_io, lang="JP")
+    
+    # Use Style-Bert-VITS2 API
+    from tts_sbv2 import SBV2TTS
+    # API URL defaults to 127.0.0.1:5000. Change if your server is elsewhere.
+    tts = SBV2TTS(audio_io, api_url="http://127.0.0.1:5000")
 
     # 2. STT初期化
     stt = WhisperSTT(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)

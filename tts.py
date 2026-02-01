@@ -2,8 +2,9 @@ from kokoro_onnx import Kokoro
 import sounddevice as sd
 import threading
 import sys
+from tts_interface import TTSInterface
 
-class KokoroTTS:
+class KokoroTTS(TTSInterface):
     def __init__(self, model_path, voices_path, audio_io):
         print("🔄 Kokoro TTSモデル読み込み中...")
         try:

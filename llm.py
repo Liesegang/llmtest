@@ -33,7 +33,7 @@ class LocalLLM:
 
     def generate_stream(self, prompt: str, system_prompt: str = None):
         if system_prompt is None:
-            system_prompt = "You are the chat assistant like Amazon echo, Siri and Google assistant. Please answer my questions as conversation in English shortly."
+            system_prompt = "あなたはSiriやAlexaのようなチャットアシスタントです。日本語で簡潔に答えてください。"
 
         formatted_prompt = (
             f"<|im_start|>system\n{system_prompt}<|im_end|>\n"

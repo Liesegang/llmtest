@@ -14,8 +14,6 @@ class WhisperSTT:
         self.is_running = False
         self.sample_rate = 16000
         self.block_size = 512
-        
-
 
     def _transcribe_worker(self, on_text_callback):
         print("🔄 VADモデル読み込み中...")
@@ -93,7 +91,7 @@ class WhisperSTT:
                                 segments, _ = self.model.transcribe(
                                     full_audio,
                                     beam_size=10,
-                                    language="en",
+                                    language="ja",
                                     condition_on_previous_text=False, # Reduce hallucinations in streaming
                                     initial_prompt="This is a polite English conversation.",
                                     word_timestamps=True
@@ -119,7 +117,6 @@ class WhisperSTT:
                             # vad_model.reset_states() # If model is stateful? Silero standard model is usually stateless per forward? 
                             # Actually Silero V5 is stateful but standard hub load might be v4.
                             # Standard usage `model(x, sr)` is often stateless context-wise unless state is passed.
-
 
     def start(self, audio_io, on_text_callback):
         self.is_running = True
