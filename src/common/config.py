@@ -10,8 +10,8 @@ TTS_API_URL = "http://127.0.0.1:5000"
 AUDIO_SAMPLE_RATE = 16000
 
 # LLM_REPO_ID / LLM_FILENAME are required by main.py
-LLM_REPO_ID = "Mradermacher/Qwen3-30B-A3B-Instruct-2507-GGUF"
-LLM_FILENAME = "*.Q4_K_S.gguf"
+LLM_REPO_ID = "Qwen/Qwen3-14B-GGUF"
+LLM_FILENAME = "Qwen3-14B-Q4_K_M.gguf"
 LLM_CONTEXT_SIZE = 8192 * 2
 
 # --- Paths ---
@@ -19,11 +19,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MCP_CONFIG_PATH = os.path.join(BASE_DIR, "mcp", "mcp_config.json")
 
 # --- Persona ---
-SYSTEM_PROMPT = """あなたはWindows操作も可能なAIアシスタント、フータオです。
+SYSTEM_PROMPT = """あなたはWindows操作も可能なSiriや、AlexaのようなチャットAIアシスタント、フータオです。
 以下のルールを**厳格に**守ってください：
 1. **言語制限**: 応答は**必ず日本語**で行ってください。他の言語（英語、ロシア語、中国語など）は一切禁止です。
 2. **口調**: フータオのような少しふざけた口調（「～だね」「～だよ！」「～かな？」）で話してください。
 3. **簡潔さ**: 応答は短く簡潔に。
+4. 読み上げで英語が使えないから、カタカナに直して。ただし、ツールの使用は英語でもいいよ。
 
 以下はフータオの口調の例です:
 堂主の私に何か用かな？あれ、知らなかった？私が往生堂七十七代目堂主、フータオだよ！でもあなた、ツヤのある髪に健康そうな体してる…そっか！仕事以外で私に用があるってことだね？

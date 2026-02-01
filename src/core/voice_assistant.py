@@ -54,8 +54,10 @@ class VoiceAssistant:
             tool_calls_buffer = []
             
             # State for parsing explicit <tool_call> tags (Qwen-style)
+            # and <think> tags (Reasoning models)
             stream_buffer = ""
             in_tool_tag = False
+            in_think_tag = False
             
             # Get generator from LLM
             history = self.conversation.get_history()
@@ -66,8 +68,8 @@ class VoiceAssistant:
 
             for type_, data in stream_gen:
                 if type_ == "content":
-                    # [DEBUG] Print raw content to verify tool call generation
-                    print(f"[RAW]: {repr(data)}") 
+                    # [DEBUG] Print data only if not just whitespace to reduce noise, or keep raw
+                    # print(f"[RAW]: {repr(data)}") 
                     
                     if not first_token_received:
                         ttft = time.time() - start_time
@@ -76,6 +78,19 @@ class VoiceAssistant:
 
                     stream_buffer += data
                     
+                    # --- Think Tag Filtering ---
+                    if "<think>" in stream_buffer:
+                        in_think_tag = True
+                    
+                    if in_think_tag:
+                        if "</think>" in stream_buffer:
+                            # Remove thought block completely
+                            stream_buffer = re.sub(r'<think>.*?</think>', '', stream_buffer, flags=re.DOTALL)
+                            in_think_tag = False
+                        else:
+                            # Still in thought, keep buffering (do NOT output)
+                            continue
+
                     # --- Qwen/XML Tool Call Parsing Logic ---
                     if "<tool_call>" in stream_buffer:
                         in_tool_tag = True
@@ -89,7 +104,7 @@ class VoiceAssistant:
                             
                             # 2. Extract Text Content (remove tool calls)
                             text_part = re.sub(r'<tool_call>.*?</tool_call>', '', stream_buffer, flags=re.DOTALL)
-                            if text_part:
+                            if text_part.strip():
                                 print(text_part, end="", flush=True)
                                 self.tts.speak(text_part, lang="en-us")
                                 content_buffer += text_part
@@ -99,20 +114,22 @@ class VoiceAssistant:
                             in_tool_tag = False
                     else:
                         # Encapsulate partial tag check
-                        if not (stream_buffer.endswith("<") or stream_buffer.endswith("<tool")):
-                            print(stream_buffer, end="", flush=True)
-                            self.tts.speak(stream_buffer, lang="en-us")
-                            content_buffer += stream_buffer
+                        if not self._is_partial_tag(stream_buffer):
+                            if stream_buffer: # Allow whitespace for spacing in console, but TTS handles strip check
+                                print(stream_buffer, end="", flush=True)
+                                self.tts.speak(stream_buffer, lang="en-us")
+                                content_buffer += stream_buffer
                             stream_buffer = "" # Consumed
                 
                 elif type_ == "tool_calls":
                     tool_calls_buffer.extend(data)
 
             # Flush remaining buffer
-            if stream_buffer and not in_tool_tag:
-                print(stream_buffer, end="", flush=True)
-                self.tts.speak(stream_buffer, lang="en-us")
-                content_buffer += stream_buffer
+            if stream_buffer and not in_tool_tag and not in_think_tag:
+                 if stream_buffer:
+                    print(stream_buffer, end="", flush=True)
+                    self.tts.speak(stream_buffer, lang="en-us")
+                    content_buffer += stream_buffer
 
             print("") # End of line
 
@@ -150,7 +167,21 @@ class VoiceAssistant:
             return False
 
     def _is_partial_tag(self, text: str) -> bool:
-        return text.endswith("<") or text.endswith("<tool")
+        """Check if text ends with a partial start tag (<, <tool, <think, etc)"""
+        if not text:
+            return False
+        # Check for start of tool_call or think
+        return (
+            text.endswith("<") or 
+            text.endswith("<t") or 
+            text.endswith("<to") or 
+            text.endswith("<too") or 
+            text.endswith("<tool") or
+            text.endswith("<th") or
+            text.endswith("<thi") or
+            text.endswith("<thin") or
+            text.endswith("<think")
+        )
 
     def _execute_tool_calls(self, tool_calls: List[Dict]):
         for tc in tool_calls:

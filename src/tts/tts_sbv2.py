@@ -18,7 +18,7 @@ class SBV2TTS(TTSInterface):
         print(f"🔄 SBV2TTS API Setup: {self.api_url} (Model={model_id})")
 
     def speak(self, text: str, **kwargs):
-        if not text:
+        if not text.strip():
             return
 
         print(f"🔊 SBV2 Speaking: {text}")

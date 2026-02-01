@@ -658,8 +658,8 @@ wheels = [
 
 [[package]]
 name = "llama-cpp-python"
-version = "0.3.4"
-source = { registry = "https://abetlen.github.io/llama-cpp-python/whl/cu124" }
+version = "0.3.16"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "diskcache" },
     { name = "jinja2" },
@@ -667,14 +667,7 @@ dependencies = [
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "typing-extensions" },
 ]
-wheels = [
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp310-cp310-linux_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp310-cp310-win_amd64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp311-cp311-linux_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp311-cp311-win_amd64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp312-cp312-linux_x86_64.whl" },
-    { url = "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp312-cp312-win_amd64.whl" },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/b4/c8cd17629ced0b9644a71d399a91145aedef109c0333443bef015e45b704/llama_cpp_python-0.3.16.tar.gz", hash = "sha256:34ed0f9bd9431af045bb63d9324ae620ad0536653740e9bb163a2e1fcb973be6", size = 50688636, upload-time = "2025-08-15T04:58:29.212Z" }
 
 [[package]]
 name = "markupsafe"
@@ -2038,7 +2031,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "faster-whisper" },
-    { name = "llama-cpp-python", specifier = "==0.3.4", index = "https://abetlen.github.io/llama-cpp-python/whl/cu124" },
+    { name = "llama-cpp-python", specifier = "==0.3.16" },
     { name = "mcp" },
     { name = "numpy" },
     { name = "requests" },

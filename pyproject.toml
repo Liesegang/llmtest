@@ -10,7 +10,7 @@ dependencies = [
     "scipy",
     "sounddevice",
     "faster-whisper",
-    "llama-cpp-python==0.3.4",
+    "llama-cpp-python==0.3.16",
     "mcp",
     "torch",
     "torchaudio"
@@ -18,11 +18,3 @@ dependencies = [
 
 [tool.uv]
 package = true
-
-[[tool.uv.index]]
-name = "llama-cpp-whl"
-url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
-explicit = true
-
-[tool.uv.sources]
-llama-cpp-python = { index = "llama-cpp-whl" }
