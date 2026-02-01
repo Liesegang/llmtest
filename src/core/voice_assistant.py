@@ -184,6 +184,9 @@ class VoiceAssistant:
         )
 
     def _execute_tool_calls(self, tool_calls: List[Dict]):
+        # Late import to avoid circular dependency if any (though usually safe here)
+        from src.common import config as cfg
+        
         for tc in tool_calls:
             fn_name = tc['function']['name']
             args_str = tc['function']['arguments']
@@ -196,7 +199,14 @@ class VoiceAssistant:
                 result_text = self.mcp_client.call_tool(fn_name, args)
             except Exception as e:
                 result_text = f"Error: {e}"
-                
-            print(f"   -> Result: {str(result_text)[:100]}...")
             
-            self.conversation.add_tool_output(call_id, str(result_text))
+            # --- Safety Truncation ---
+            text_str = str(result_text)
+            if len(text_str) > cfg.MAX_TOOL_OUTPUT_CHARS:
+                limit = cfg.MAX_TOOL_OUTPUT_CHARS
+                truncated_len = len(text_str)
+                text_str = text_str[:limit] + f"\n... (Truncated. Output length: {truncated_len}, Limit: {limit})"
+                
+            print(f"   -> Result: {text_str[:100]}...")
+            
+            self.conversation.add_tool_output(call_id, text_str)

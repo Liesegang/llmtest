@@ -19,7 +19,7 @@
     },
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/Users/Public/Documents"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/Users"]
     }
   }
 }

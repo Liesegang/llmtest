@@ -13,8 +13,13 @@ dependencies = [
     "llama-cpp-python==0.3.16",
     "mcp",
     "torch",
-    "torchaudio"
+    "torchaudio",
 ]
 
 [tool.uv]
 package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

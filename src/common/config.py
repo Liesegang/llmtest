@@ -12,7 +12,10 @@ AUDIO_SAMPLE_RATE = 16000
 # LLM_REPO_ID / LLM_FILENAME are required by main.py
 LLM_REPO_ID = "Qwen/Qwen3-14B-GGUF"
 LLM_FILENAME = "Qwen3-14B-Q4_K_M.gguf"
-LLM_CONTEXT_SIZE = 8192 * 2
+LLM_CONTEXT_SIZE = 8192 * 4
+
+# --- Safety ---
+MAX_TOOL_OUTPUT_CHARS = 8000
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
