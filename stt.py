@@ -15,30 +15,25 @@ class WhisperSTT:
         self.sample_rate = 16000
         self.block_size = 512
         
-    def _audio_callback(self, indata, frames, time, status):
-        if status:
-            print(status, file=sys.stderr)
-        self.audio_queue.put(indata.copy())
+
 
     def _transcribe_worker(self, on_text_callback):
-        """
-        音声データを監視し、VADで区切られた「一文」ごとに推論を回す
-        """
-        # Silero VADのロード
         print("🔄 VADモデル読み込み中...")
         vad_model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                                           model='silero_vad',
                                           force_reload=False,
                                           trust_repo=True)
-        (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
-        
-        # VADイテレータ
-        vad_iterator = VADIterator(vad_model)
+        # We only need the model for manual inference
         
         print(f"\n🎧 待機中... 話しかけてください (Ctrl+C で終了)\n")
 
         current_speech_buffer = []
         is_speaking = False
+        silence_counter = 0
+
+        # VAD requires exactly 512 samples for 16kHz
+        VAD_WINDOW = 512 
+        buffer_accum = np.zeros(0, dtype='float32')
 
         while self.is_running:
             try:
@@ -46,71 +41,91 @@ class WhisperSTT:
             except queue.Empty:
                 continue
 
-            audio_chunk = torch.from_numpy(data.flatten())
-            speech_dict = vad_iterator(audio_chunk, return_seconds=True)
-            current_speech_buffer.append(data)
-
-            if speech_dict:
-                if 'start' in speech_dict:
+            # Accumulate buffer
+            buffer_accum = np.concatenate((buffer_accum, data.flatten()))
+            
+            # Process in 512-sample chunks
+            while len(buffer_accum) >= VAD_WINDOW:
+                # Extract 512 samples
+                audio_chunk_np = buffer_accum[:VAD_WINDOW]
+                buffer_accum = buffer_accum[VAD_WINDOW:]
+                
+                audio_chunk = torch.from_numpy(audio_chunk_np)
+                
+                # Dynamic Threshold Logic
+                # If AI is playing, set high threshold (only loud inputs)
+                # If silent, set low threshold (sensitive)
+                if self.audio_io and self.audio_io.is_playing:
+                    threshold = 0.8
+                else:
+                    threshold = 0.4
+                    
+                # Manual Inference
+                # Note: Silero VAD model expects (batch, samples) or just samples?
+                # Usually (1, samples) or (samples,).
+                speech_prob = vad_model(audio_chunk, 16000).item()
+                
+                if speech_prob > threshold:
+                    silence_counter = 0
                     if not is_speaking:
                         sys.stdout.write("🗣️  認識開始...\r")
                         sys.stdout.flush()
                         is_speaking = True
-                        current_speech_buffer = current_speech_buffer[-10:]
-
-                if 'end' in speech_dict:
-                    sys.stdout.write("                   \r")
-                    
-                    if len(current_speech_buffer) > 0:
-                        full_audio = np.concatenate(current_speech_buffer, axis=0).flatten()
+                        current_speech_buffer = current_speech_buffer[-10:] # Keep pre-roll
+                    current_speech_buffer.append(audio_chunk_np)
+                else:
+                    if is_speaking:
+                        silence_counter += 1
+                        current_speech_buffer.append(audio_chunk_np) # Keep trailing silence for a bit
                         
-                        # 推論実行 (英語)
-                        segments, _ = self.model.transcribe(
-                            full_audio,
-                            beam_size=10,
-                            language="en",
-                            condition_on_previous_text=False,
-                            initial_prompt="This is a polite English conversation.",
-                            word_timestamps=True
-                        )
+                        # End of speech detection (e.g. 500ms silence = ~16 chunks of 512sa)
+                        if silence_counter > 20: 
+                            sys.stdout.write("                   \r")
+                            # Process Audio
+                            if len(current_speech_buffer) > 0:
+                                full_audio = np.concatenate(current_speech_buffer, axis=0).flatten()
+                                
+                                segments, _ = self.model.transcribe(
+                                    full_audio,
+                                    beam_size=10,
+                                    language="en",
+                                    condition_on_previous_text=False, # Reduce hallucinations in streaming
+                                    initial_prompt="This is a polite English conversation.",
+                                    word_timestamps=True
+                                )
 
-                        segments = list(segments)
-                        text_result = "".join([s.text for s in segments]).strip()
-                        
-                        if text_result:
-                            print(f"User: {text_result}")
-                            on_text_callback(text_result)
+                                segments = list(segments)
+                                text_result = "".join([s.text for s in segments]).strip()
+                                
+                                if text_result:
+                                    print(f"User: {text_result}")
+                                    on_text_callback(text_result)
+                                    
+                                    for segment in segments:
+                                        if segment.words:
+                                            for word in segment.words:
+                                                print(f"[{word.start:.2f}s -> {word.end:.2f}s] {word.word}")
+
+                                print("---------------------------")
                             
-                            for segment in segments:
-                                if segment.words:
-                                    for word in segment.words:
-                                        print(f"[{word.start:.2f}s -> {word.end:.2f}s] {word.word}")
+                            is_speaking = False
+                            current_speech_buffer = []
+                            silence_counter = 0
+                            # vad_model.reset_states() # If model is stateful? Silero standard model is usually stateless per forward? 
+                            # Actually Silero V5 is stateful but standard hub load might be v4.
+                            # Standard usage `model(x, sr)` is often stateless context-wise unless state is passed.
 
-                        print("---------------------------")
 
-                    is_speaking = False
-                    current_speech_buffer = []
-                    vad_iterator.reset_states()
-
-    def start(self, on_text_callback):
+    def start(self, audio_io, on_text_callback):
         self.is_running = True
-        
-        # 録音スレッド開始 (sounddeviceはブロックするので、ここではInputStreamを開いたままworkerを呼ぶ形にするか、
-        # あるいはInputStreamを別管理にする必要がある。
-        # シンプルにメインスレッドをブロックしないように、ここでもう一つスレッドを作るか、
-        # あるいはmain.py側でブロックさせるか。
-        # 今回はstt.pyが自律的に動くように、内部でInputStream管理とWorkerスレッド起動を行う。
+        self.audio_io = audio_io
+        self.audio_queue = audio_io.input_queue 
+
         
         self.worker_thread = threading.Thread(
-            target=self._transcribe_worker_wrapper, 
+            target=self._transcribe_worker, 
             args=(on_text_callback,), 
             daemon=True
         )
         self.worker_thread.start()
 
-    def _transcribe_worker_wrapper(self, on_text_callback):
-        # InputStreamをこのスレッド(またはCallback)で維持する必要がある。
-        # sounddevice.InputStream はContext Managerとして使うのが一般的。
-        with sd.InputStream(samplerate=self.sample_rate, channels=1, 
-                            callback=self._audio_callback, blocksize=self.block_size):
-            self._transcribe_worker(on_text_callback)

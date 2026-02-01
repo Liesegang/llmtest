@@ -51,9 +51,12 @@ def input_listener(tts, llm):
             if user_input:
                 print(f"🤔 AI考え中... User: {user_input}")
                 try:
-                    response = llm.generate(user_input)
-                    print(f"🤖 AI Answer: {response}")
-                    tts.speak(response, lang="en-us")
+                    # ストリーミング生成で、一文ごとにTTSに投げる
+                    print(f"🤖 AI Answer: ", end="", flush=True)
+                    for sentence in llm.generate_stream(user_input):
+                        print(sentence, end="", flush=True)
+                        tts.speak(sentence, lang="en-us")
+                    print("") # 改行
                 except Exception as e:
                     print(f"❌ LLM生成エラー: {e}")
             else:
@@ -65,27 +68,26 @@ def input_listener(tts, llm):
             break
 
 def main():
-    # 1. TTS初期化
-    tts = KokoroTTS(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH)
+    # 0. AudioIO初期化 (AEC搭載)
+    from audio_io import AudioIO
+    audio_io = AudioIO(sample_rate=16000)
+
+    # 1. TTS初期化 (AudioIOを注入)
+    tts = KokoroTTS(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH, audio_io)
 
     # 2. STT初期化
     stt = WhisperSTT(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
     
     # 3. LLM初期化
-    # モデルが存在しない、またはライブラリがない場合は例外が出る可能性があるため注意
     try:
-        llm = LocalLLM(LLM_MODEL_PATH)
+        llm = LocalLLM(MODEL_PATH)
     except Exception as e:
         print(f"⚠️ LLM初期化失敗: {e}")
         llm = None
         print("LLM機能なしで起動します（Enterでオウム返しになります）")
 
     # 4. 入力監視スレッド開始
-    # llmがNoneの場合は簡易的にオウム返しにするか、エラーにするか。
-    # ここでは簡易ダミーLLMクラスを作るか、input_listener内で分岐するかだが、
-    # input_listenerを修正して対応する。
     if llm is None:
-        # ダミーLLM (オウム返し)
         class DummyLLM:
             def generate(self, prompt):
                 return f"Echo: {prompt}"
@@ -94,8 +96,9 @@ def main():
     input_thread = threading.Thread(target=input_listener, args=(tts, llm), daemon=True)
     input_thread.start()
 
-    # 5. STT開始 (ブロックしない)
-    stt.start(on_text_callback=on_stt_text)
+    # 5. AudioIO & STT開始
+    audio_io.start()
+    stt.start(audio_io, on_text_callback=on_stt_text)
 
     # メインスレッドを維持
     try:
@@ -103,7 +106,8 @@ def main():
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n🛑 終了します")
-        stt.is_running = False # 停止フラグ (stt.py側でチェックが必要)
+        audio_io.stop()
+        stt.is_running = False
 
 if __name__ == "__main__":
     main()
