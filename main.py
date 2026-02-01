@@ -22,57 +22,34 @@ KOKORO_VOICES_PATH = "model_assets/voices-v1.0.bin"
 # LLM設定
 MODEL_PATH = "model_assets/qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf"
 
-# グローバルバッファ
-stt_buffer = []
-buffer_lock = threading.Lock()
+# 処理中のフラグ
+processing_lock = threading.Lock()
 
-def on_stt_text(text):
+def process_response(text, tts, llm):
     """
-    STTからテキストが返ってきたときのコールバック
+    LLMに投げてTTSで喋らせる（ブロッキング実行想定）
     """
-    with buffer_lock:
-        stt_buffer.append(text)
+    if not text:
+        return
 
-def input_listener(tts, llm):
-    """
-    Enterキー入力を監視して、バッファの内容を読み上げる
-    """
-    print("\n⌨️  Enterキーを押すと、ここまでの会話に対して返答します...\n")
-    while True:
+    with processing_lock: # 同時実行を防ぐ（簡易的）
+        print(f"🤔 AI考え中... User: {text}")
         try:
-            input() # Enter待機
-            
-            user_input = ""
-            with buffer_lock:
-                if stt_buffer:
-                    user_input = " ".join(stt_buffer)
-                    stt_buffer.clear()
-            
-            if user_input:
-                print(f"🤔 AI考え中... User: {user_input}")
-                try:
-                    # ストリーミング生成で、一文ごとにTTSに投げる
-                    print(f"🤖 AI Answer: ", end="", flush=True)
-                    for sentence in llm.generate_stream(user_input):
-                        print(sentence, end="", flush=True)
-                        tts.speak(sentence, lang="en-us")
-                    print("") # 改行
-                except Exception as e:
-                    print(f"❌ LLM生成エラー: {e}")
-            else:
-                print("📭 バッファは空です")
-                
-        except EOFError:
-            break
-        except KeyboardInterrupt:
-            break
+            # ストリーミング生成で、一文ごとにTTSに投げる
+            print(f"🤖 AI Answer: ", end="", flush=True)
+            for sentence in llm.generate_stream(text):
+                print(sentence, end="", flush=True)
+                tts.speak(sentence, lang="en-us")
+            print("") # 改行
+        except Exception as e:
+            print(f"❌ LLM生成エラー: {e}")
 
 def main():
-    # 0. AudioIO初期化 (AEC搭載)
+    # 0. AudioIO初期化 (NVIDIA Broadcast想定)
     from audio_io import AudioIO
     audio_io = AudioIO(sample_rate=16000)
 
-    # 1. TTS初期化 (AudioIOを注入)
+    # 1. TTS初期化
     tts = KokoroTTS(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH, audio_io)
 
     # 2. STT初期化
@@ -84,21 +61,27 @@ def main():
     except Exception as e:
         print(f"⚠️ LLM初期化失敗: {e}")
         llm = None
-        print("LLM機能なしで起動します（Enterでオウム返しになります）")
+        print("LLM機能なしで起動します")
 
-    # 4. 入力監視スレッド開始
     if llm is None:
         class DummyLLM:
-            def generate(self, prompt):
-                return f"Echo: {prompt}"
+            def generate_stream(self, prompt):
+                yield f"Echo: {prompt}"
         llm = DummyLLM()
 
-    input_thread = threading.Thread(target=input_listener, args=(tts, llm), daemon=True)
-    input_thread.start()
+    # コールバック定義 (ここで直接処理をキックする)
+    def on_stt_text(text):
+        if not text.strip():
+            return
+        # 処理スレッドにオフロードして、STTのメインループを止めないようにする
+        # (ただし、会話の順番を守るならここでブロックしても良いが、音声取得が止まると困る)
+        threading.Thread(target=process_response, args=(text, tts, llm)).start()
 
     # 5. AudioIO & STT開始
     audio_io.start()
     stt.start(audio_io, on_text_callback=on_stt_text)
+
+    print("\n🎤 会話待機中... 話しかけると自動で返答します (Ctrl+C で終了)\n")
 
     # メインスレッドを維持
     try:

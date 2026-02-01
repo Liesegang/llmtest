@@ -2,7 +2,7 @@ import os
 from llama_cpp import Llama
 
 class LocalLLM:
-    def __init__(self, model_path: str, context_size: int = 2048, gpu_layers: int = -1):
+    def __init__(self, model_path: str, context_size: int = 512, gpu_layers: int = -1):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model not found: {model_path}")
 
@@ -33,7 +33,7 @@ class LocalLLM:
 
     def generate_stream(self, prompt: str, system_prompt: str = None):
         if system_prompt is None:
-            system_prompt = "簡潔に答えて。" # システムプロンプトも短くして速度優先
+            system_prompt = "You are the chat assistant like Amazon echo, Siri and Google assistant. Please answer my questions as conversation in English shortly."
 
         formatted_prompt = (
             f"<|im_start|>system\n{system_prompt}<|im_end|>\n"

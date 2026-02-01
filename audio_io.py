@@ -22,17 +22,52 @@ class AudioIO:
     def start(self):
         if self.stream is not None:
             return
+            
+        # Device Selection Logic
+        input_device = None
+        output_device = None
+        
+        print("🔍 Audio Device Search (Target: NVIDIA Broadcast / RTX Voice)...")
+        try:
+            devices = sd.query_devices()
+            # Targets: "NVIDIA Broadcast", "RTX Voice", "RTX-Audio"
+            # We match partial string.
+            
+            for i, d in enumerate(devices):
+                name = d['name']
+                name_lower = name.lower()
+                # Look for Input
+                if ("nvidia" in name_lower and "broadcast" in name_lower) or \
+                   ("rtx" in name_lower and ("point" in name_lower or "voice" in name_lower)):
+                    if d['max_input_channels'] > 0 and input_device is None:
+                        input_device = i
+                        print(f"  🎤 Found Input: [{i}] {name}")
+                    if d['max_output_channels'] > 0 and output_device is None:
+                        # User reported that System Default output wasn't recognized by AEC.
+                        # Route Output through NVIDIA Broadcast so it captures the reference signal.
+                        output_device = i
+                        print(f"  🔊 Found Output: [{i}] {name}")
+
+        except Exception as e:
+            print(f"⚠️ Device search failed: {e}")
+
+        # Fallback to defaults if not found
+        if input_device is None:
+            print("  ⚠️ NVIDIA Broadcast Input not found. Using system default.")
+        if output_device is None:
+            print("  ⚠️ NVIDIA Broadcast Output not found. Using system default.")
 
         self.running = True
         self.stream = sd.Stream(
             samplerate=self.sample_rate,
             blocksize=self.block_size,
+            device=(input_device, output_device),
             dtype='float32',
             channels=1,
             callback=self._callback
         )
         self.stream.start()
-        print("✅ AudioIO Started (NVIDIA Broadcast Mode)")
+        print(f"✅ AudioIO Started | Device: In={input_device}, Out={output_device}")
 
     def stop(self):
         self.running = False
@@ -52,12 +87,23 @@ class AudioIO:
             self.output_queue.put(chunk)
             cursor += self.block_size
 
+    def cancel_playback(self):
+        """
+        現在の再生キューをクリアして直ちに音声を止める
+        """
+        with self.output_queue.mutex:
+            self.output_queue.queue.clear()
+        self._is_playing_internal = False
+
     @property
     def is_playing(self):
         # Check if queue has items or if we recently processed output
         return not self.output_queue.empty() or self._is_playing_internal
 
     def _callback(self, indata, outdata, frames, time, status):
+        if status:
+            print(status, file=sys.stderr)
+            
         # 1. Output Processing (Speaker)
         try:
             out_chunk = self.output_queue.get_nowait()
@@ -69,5 +115,6 @@ class AudioIO:
         outdata[:] = out_chunk.reshape(-1, 1)
 
         # 2. Input Processing (Mic)
-        # Just Pass-through. NVIDIA Broadcast handles noise/echo.
+        # Barge-in Enabled: We pass input through.
+        # We rely on NVIDIA Broadcast (set in start()) to remove the echo.
         self.input_queue.put(indata.flatten())

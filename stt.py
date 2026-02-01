@@ -68,6 +68,11 @@ class WhisperSTT:
                 if speech_prob > threshold:
                     silence_counter = 0
                     if not is_speaking:
+                        # Start of speech (Barge-in)
+                        if self.audio_io and self.audio_io.is_playing:
+                             sys.stdout.write("\n🛑 割り込み検知 (Barge-in) -> 再生停止\n")
+                             self.audio_io.cancel_playback()
+                             
                         sys.stdout.write("🗣️  認識開始...\r")
                         sys.stdout.flush()
                         is_speaking = True
