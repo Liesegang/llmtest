@@ -1,0 +1,28 @@
+[project]
+name = "voice-assistant"
+version = "0.1.0"
+description = "Local Voice Assistant with MCP Support"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "numpy",
+    "scipy",
+    "sounddevice",
+    "faster-whisper",
+    "llama-cpp-python==0.3.4",
+    "mcp",
+    "torch",
+    "torchaudio"
+]
+
+[tool.uv]
+package = true
+
+[[tool.uv.index]]
+name = "llama-cpp-whl"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+llama-cpp-python = { index = "llama-cpp-whl" }

@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import sounddevice as sd
 import torch
+import time
 from faster_whisper import WhisperModel
 
 class WhisperSTT:
@@ -88,6 +89,7 @@ class WhisperSTT:
                             if len(current_speech_buffer) > 0:
                                 full_audio = np.concatenate(current_speech_buffer, axis=0).flatten()
                                 
+                                start_time = time.time()
                                 segments, _ = self.model.transcribe(
                                     full_audio,
                                     beam_size=10,
@@ -100,8 +102,10 @@ class WhisperSTT:
                                 segments = list(segments)
                                 text_result = "".join([s.text for s in segments]).strip()
                                 
+                                latency = time.time() - start_time
+                                
                                 if text_result:
-                                    print(f"User: {text_result}")
+                                    print(f"User: {text_result} (STT Latency: {latency:.2f}s)")
                                     on_text_callback(text_result)
                                     
                                     for segment in segments:

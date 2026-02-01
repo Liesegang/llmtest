@@ -1,2 +1,6 @@
-model_assets
 __pycache__
+__pycache__/*
+src/mcp_config.json
+.venv
+.venv/*
+config.py

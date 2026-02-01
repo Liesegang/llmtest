@@ -5,10 +5,10 @@ import scipy.signal
 import io
 import threading
 import urllib.parse
-from tts_interface import TTSInterface
+from src.tts.tts_interface import TTSInterface
 
 class SBV2TTS(TTSInterface):
-    def __init__(self, audio_io, api_url="http://127.0.0.1:5000", model_id=8, style="happy", style_weight=1.0):
+    def __init__(self, audio_io, api_url="http://127.0.0.1:5000", model_id=2, style="s1", style_weight=1.0):
         self.audio_io = audio_io
         self.api_url = api_url.rstrip("/")
         self.model_id = model_id
@@ -42,7 +42,8 @@ class SBV2TTS(TTSInterface):
             "style": style,
             "style_weight": self.style_weight,
             "language": "JP", # Force JP usually
-            "encoding": "utf-8" # Make sure text is handled right
+            "encoding": "utf-8", # Make sure text is handled right,
+            "length": 0.7
         }
 
         try:
